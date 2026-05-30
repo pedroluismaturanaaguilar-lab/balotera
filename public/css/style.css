@@ -1,0 +1,537 @@
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #1a6b2f;
+}
+
+body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== PANTALLA PRINCIPAL (80 números visibles) ========== */
+.main-screen {
+  display: flex;
+  height: 100%;
+  background: #1a6b2f;
+  padding: 4px;
+}
+
+.left-panel {
+  flex: 1;
+  background: #1a6b2f;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Barra superior */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0e4a1f;
+  padding: 4px 10px;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.round-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  background: #000000aa;
+  padding: 4px 12px;
+  border-radius: 30px;
+}
+
+.round-label {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #ffcc00;
+}
+
+.round-value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  font-family: monospace;
+  background: black;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: #0f0;
+}
+
+.timer {
+  font-size: 1rem;
+  font-weight: bold;
+  background: #000000aa;
+  padding: 4px 12px;
+  border-radius: 30px;
+  font-family: monospace;
+  color: #0f0;
+}
+
+/* Números sorteados - grid 20 columnas ocupa todo el ancho */
+.numbers-drawn-bar {
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 2px;
+  background: #0e4a1f;
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.numbers-drawn-bar span {
+  background: #f0a500;
+  color: #1e2a3a;
+  font-weight: bold;
+  text-align: center;
+  padding: 2px 0;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Grid de bolas - 10x8 ocupa el espacio restante */
+.balls-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  gap: 2px;
+  margin: 2px 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ball {
+  position: relative;
+  background: radial-gradient(circle at 30% 30%, #1E5631, #0A2F1A);
+  color: white;
+  font-weight: bold;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  cursor: default;
+  transition: 0.1s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  line-height: 1;
+}
+
+.ball::before {
+  display: none;
+  content: none;
+}
+
+.ball.marked {
+  background: radial-gradient(circle at 30% 30%, #F7D44A, #E6B800);
+  color: #C20E0E !important;
+  transform: scale(1.01);
+}
+
+/* Iconos caliente/frío */
+.ball.hot::after {
+  content: "🔥";
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  font-size: 0.7rem;
+  background: none;
+  text-shadow: 0 0 1px black;
+  z-index: 10;
+  pointer-events: none;
+}
+.ball.cold::after {
+  content: "❄️";
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  font-size: 0.7rem;
+  background: none;
+  text-shadow: 0 0 1px black;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.ball.pop {
+  animation: pop 0.3s ease-out;
+}
+@keyframes pop {
+  0% { transform: scale(1); background: #ffaa00; }
+  50% { transform: scale(1.1); background: #ff5500; }
+  100% { transform: scale(1); }
+}
+
+.mini-accumulated-bar {
+  width: 100%;
+  height: 10px;
+  background: #555;
+  border-radius: 5px;
+  margin: 4px 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.5s, background-color 0.3s;
+}
+.fill.cafe { background: #8B4513; }
+.fill.rojo { background: #B22222; }
+.fill.amarillo { background: #DAA520; }
+.fill.verde { background: #228B22; }
+
+.winner-message {
+  font-size: 0.85rem;
+  text-align: center;
+  background: gold;
+  color: black;
+  padding: 4px;
+  border-radius: 8px;
+  animation: pulse 1s infinite;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.01); background: #ffcc00; }
+}
+
+/* ========== PANEL DE APUESTAS ========== */
+body.betting-page {
+  overflow: hidden;
+  height: 100vh;
+  padding: 8px;
+  margin: 0;
+}
+
+.betting-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.saldo-info {
+  background: #000000aa;
+  padding: 6px;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 8px;
+  font-size: 1rem;
+  flex-shrink: 0;
+  color: white;
+}
+
+.pay-section, .repeat-section {
+  background: #0f1720;
+  border-radius: 10px;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #2c7da0;
+  flex-shrink: 0;
+}
+.pay-section h3, .repeat-section h3 {
+  margin: 0 0 4px 0;
+  font-size: 0.9rem;
+  color: white;
+}
+.pay-section input, .repeat-section input {
+  font-size: 0.8rem;
+  padding: 4px;
+}
+
+.apuestas-row {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.numbers-selection {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ticket-summary {
+  flex: 1;
+  background: #0f1720;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid #2c7da0;
+  overflow-y: auto;
+  color: white;
+}
+
+.balls-grid-small {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  gap: 2px;
+  margin: 4px 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.ball-small {
+  position: relative;
+  background: #f0f0f0;
+  color: #1e2a3a;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid #aaa;
+  font-size: 0.75rem;
+  border-radius: 0;
+  width: 100%;
+  height: 100%;
+}
+.ball-small.selected {
+  background: #4caf50;
+  color: white;
+  border-color: white;
+}
+
+.bet-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 6px 0;
+  flex-shrink: 0;
+}
+.bet-value-btn {
+  background: #2c7da0;
+  border: none;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  flex: 1 0 auto;
+}
+.bet-value-btn.active {
+  background: #1f5068;
+  transform: scale(0.98);
+}
+
+.bet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+.btn {
+  background: #2c7da0;
+  border: none;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.btn.active {
+  background: #1f5068;
+}
+.warning {
+  color: #ffaa00;
+  font-size: 0.8rem;
+}
+.potential-winnings {
+  background: #2c3e2f;
+  padding: 5px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  text-align: center;
+}
+.combo-item {
+  background: #e9e9e9;
+  color: #1e2a3a;
+  margin: 4px 0;
+  padding: 5px;
+  font-size: 0.8rem;
+  display: flex;
+  justify-content: space-between;
+}
+.winning-ticket-notification {
+  background: #f0a500;
+  padding: 8px;
+  font-size: 0.9rem;
+  border-radius: 10px;
+  margin-top: 8px;
+  color: #1e2a3a;
+}
+
+/* ========== PANEL DE ADMINISTRACIÓN ========== */
+body.admin-page {
+  overflow: auto !important;
+  height: 100vh !important;
+  display: block !important;
+  background: #1e2a3a;
+}
+
+.admin-container {
+  padding: 20px;
+  background: #1e2a3a;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.admin-section {
+  border: 1px solid #ccc;
+  margin: 15px 0;
+  padding: 15px;
+  background: #2c3e2f;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.admin-section label {
+  display: block;
+  margin: 8px 0;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.admin-section input {
+  margin-left: 10px;
+  padding: 5px;
+  font-size: 0.9rem;
+}
+
+.admin-section table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #1e2a3a;
+  color: white;
+  font-size: 0.8rem;
+  min-width: 600px;
+}
+
+.admin-section th, .admin-section td {
+  border: 1px solid #ddd;
+  padding: 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.btn-pay {
+  background: green;
+  color: white;
+  padding: 4px 8px;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.delete-btn {
+  background: #b22222;
+}
+
+.admin-section input[type="date"] {
+  margin-right: 5px;
+}
+
+@media (max-height: 700px) {
+  .ball { font-size: 0.7rem; }
+  .ball-small { font-size: 0.65rem; }
+  .round-value { font-size: 1rem; }
+  .timer { font-size: 0.85rem; }
+  .numbers-drawn-bar span { font-size: 0.7rem; }
+}
+
+/* Cuenta regresiva entre rondas */
+.round-restart-timer {
+  text-align: center;
+  background: #000000aa;
+  color: #ffcc00;
+  font-size: 1.2rem;
+  font-weight: bold;
+  padding: 6px;
+  margin-top: 8px;
+  border-radius: 30px;
+  animation: pulse 1s infinite;
+}
+
+/* Contador visual elegante */
+.visual-countdown {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 10px auto;
+  background: #1e2a3a;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,215,0,0.5);
+  animation: pulse-countdown 1s infinite;
+}
+.countdown-number {
+  font-size: 3rem;
+  font-weight: bold;
+  font-family: monospace;
+  color: #ffcc00;
+  text-shadow: 0 0 5px black;
+}
+@keyframes pulse-countdown {
+  0% { transform: scale(1); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(255,215,0,0.8); }
+  100% { transform: scale(1); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+}
+
+/* Animación para los números que desaparecen */
+.number-fade-out {
+  animation: slideAndFade 0.4s ease forwards;
+}
+@keyframes slideAndFade {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-30px) scale(0);
+    opacity: 0;
+  }
+}
+
+/* Animación para las bolas que se desmarcan */
+.ball-fade-out {
+  animation: ballUnmark 0.4s ease forwards;
+}
+@keyframes ballUnmark {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    background: radial-gradient(circle at 30% 30%, #F7D44A, #E6B800);
+    color: #C20E0E;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 0;
+    background: radial-gradient(circle at 30% 30%, #1E5631, #0A2F1A);
+    color: white;
+  }
+}

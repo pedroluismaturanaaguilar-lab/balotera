@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel de Apuestas - La Balotera</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .saldo-info {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      background: #000000aa;
+      padding: 8px 12px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+    .toast-message {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #2c7da0;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      z-index: 9999;
+      animation: fadeOut 3s forwards;
+    }
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      70% { opacity: 1; }
+      100% { opacity: 0; visibility: hidden; }
+    }
+    .dropdown-btn {
+      width: 100%;
+      background: #2c7da0;
+      border: none;
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .dropdown-content {
+      display: none;
+      background:  #50C878;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ddd;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .dropdown-content.show {
+      display: block;
+    }
+    .ticket-section {
+      margin-bottom: 20px;
+      border-bottom: 1px solid #2c7da0;
+      padding-bottom: 10px;
+    }
+    .recent-ticket-item {
+      border: 1px solid #ddd;
+      margin: 12px 0;
+      padding: 10px;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+    .combo-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 5px 0;
+      padding: 4px;
+      background: #f9f9f9;
+      border-radius: 4px;
+      margin: 4px 0;
+      padding: 4px;
+    }
+    .current-ticket-lines {
+      margin-top: 15px;
+      border-top: 1px solid #2c7da0;
+      padding-top: 10px;
+    }
+    .line-item {
+      background: #1a2533;
+      margin: 8px 0;
+      padding: 8px;
+      border-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+    }
+    .cancel-line {
+      background: #b22222;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin: 10px 0 5px 0;
+      color: black;
+    }
+    /* Botón de modo trampa más pequeño */
+    .betting-container {
+      position: relative;
+    }
+    .trap-toggle-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: red;
+      border: 2px solid white;
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.2s;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .trap-toggle-btn:hover {
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body class="betting-page">
+<div class="betting-container">
+  <div class="trap-toggle-btn" id="trapToggleBtn" title="Modo normal (aleatorio)"></div>
+  <h1 style="font-size:1.3rem; margin:0 0 10px 0;">🎰 Panel de Apuestas y Pagos</h1>
+
+  <div class="saldo-info">
+    <div>💰 Presupuesto máquina: $<span id="machineBalanceDisplay">5.000.000</span></div>
+    <div>📅 Ganancia del día: $<span id="dailyProfitDisplay">0</span></div>
+    <div id="saldoWarning" class="warning"></div>
+  </div>
+
+  <button id="dropdownWinningBtn" class="dropdown-btn">➕ Ver boletas gestionables (haz clic)</button>
+  <div id="winningTicketsDropdown" class="dropdown-content"></div>
+
+  <div class="apuestas-row">
+    <div class="numbers-selection">
+      <div class="selected-numbers-info"><strong>Seleccionados:</strong> <span id="selectedNumbersDisplay">Ninguno</span></div>
+      <div class="balls-grid-small" id="ballsGridSmall"></div>
+      <div class="bet-values" id="betValueButtons"></div>
+      <div class="bet-actions">
+        <button id="addComboBtn" class="btn">➕ Agregar</button>
+        <button id="machinePick2" class="btn">🤖 2 números</button>
+        <button id="machinePick3" class="btn">🤖 3 números</button>
+        <button id="machinePick4" class="btn">🤖 4 números</button>
+        <button id="machinePick5" class="btn">🤖 5 números</button>
+      </div>
+    </div>
+    <div class="ticket-summary">
+      <h3 style="margin-top:0;">🎫 Boleta actual</h3>
+      <div id="combosList"></div>
+      <div><strong>Total:</strong> $<span id="totalAmount">0</span></div>
+      <button id="printTicketBtn" class="btn">🖨️ Imprimir boleta</button>
+      <div id="currentTicketLines" class="current-ticket-lines"></div>
+      <div id="bettingWarning" class="warning"></div>
+    </div>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/betting.js"></script>
+</body>
+</html>

@@ -1,0 +1,640 @@
+const socket = io();
+let selectedNumbers = [];
+let currentBetValue = null;
+let currentTicket = [];
+let printedTickets = [];
+let canceledTickets = [];
+let currentRound = 1;
+let bettingEnabled = true;
+let machineBudget = 5000000;
+let dailyProfit = 0;
+let isBettingPhaseGlobal = true;
+
+let autoMoveTimer = null;
+
+const betValues = [1000, 2000, 3000, 4000, 5000];
+
+const ballsGrid = document.getElementById('ballsGridSmall');
+const selectedNumbersSpan = document.getElementById('selectedNumbersDisplay');
+const combosList = document.getElementById('combosList');
+const totalSpan = document.getElementById('totalAmount');
+const warningDiv = document.getElementById('bettingWarning');
+const machineBudgetSpan = document.getElementById('machineBalanceDisplay');
+const dailyProfitSpan = document.getElementById('dailyProfitDisplay');
+const saldoWarningDiv = document.getElementById('saldoWarning');
+const winningTicketsDropdown = document.getElementById('winningTicketsDropdown');
+const currentTicketLinesDiv = document.getElementById('currentTicketLines');
+const dropdownBtn = document.getElementById('dropdownWinningBtn');
+const trapToggleBtn = document.getElementById('trapToggleBtn');
+
+// ========== CREAR BOLAS ==========
+for (let i = 1; i <= 80; i++) {
+  const ball = document.createElement('div');
+  ball.className = 'ball-small';
+  ball.textContent = i;
+  ball.dataset.num = i;
+  ball.addEventListener('click', () => toggleNumber(i));
+  ballsGrid.appendChild(ball);
+}
+
+// ========== BOTONES DE APUESTA ==========
+const valueContainer = document.getElementById('betValueButtons');
+valueContainer.innerHTML = '';
+betValues.forEach(v => {
+  const btn = document.createElement('button');
+  btn.textContent = `$${v.toLocaleString()}`;
+  btn.classList.add('bet-value-btn');
+  btn.addEventListener('click', () => {
+    if (!bettingEnabled) { warningDiv.textContent = 'Apuestas no permitidas ahora.'; return; }
+    currentBetValue = v;
+    document.querySelectorAll('#betValueButtons button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+  valueContainer.appendChild(btn);
+});
+
+function updateUIEnabled() {
+  const canBet = isBettingPhaseGlobal && machineBudget > 0;
+  bettingEnabled = canBet;
+  if (!canBet) {
+    if (!isBettingPhaseGlobal) warningDiv.textContent = '⛔ Apuestas cerradas. Espera la próxima ronda.';
+    else if (machineBudget <= 0) saldoWarningDiv.textContent = '⚠️ Presupuesto insuficiente.';
+  } else {
+    warningDiv.textContent = '';
+    saldoWarningDiv.textContent = '';
+  }
+}
+
+function toggleNumber(num) {
+  if (!bettingEnabled) { warningDiv.textContent = 'No puedes seleccionar números ahora.'; return; }
+  const idx = selectedNumbers.indexOf(num);
+  if (idx === -1) selectedNumbers.push(num);
+  else selectedNumbers.splice(idx, 1);
+  updateSelectionUI();
+}
+
+// FUNCIÓN ACTUALIZAR SELECCIÓN VISUAL (asegurada)
+function updateSelectionUI() {
+  document.querySelectorAll('.ball-small').forEach(ball => {
+    const n = parseInt(ball.dataset.num);
+    if (selectedNumbers.includes(n)) {
+      ball.classList.add('selected');
+    } else {
+      ball.classList.remove('selected');
+    }
+  });
+  selectedNumbersSpan.textContent = selectedNumbers.length ? selectedNumbers.join(', ') : 'Ninguno';
+  warningDiv.textContent = '';
+}
+
+function updateTicketUI() {
+  combosList.innerHTML = '';
+  let total = 0;
+  currentTicket.forEach((combo, idx) => {
+    total += combo.betValue;
+    const div = document.createElement('div');
+    div.className = 'combo-item';
+    div.innerHTML = `<strong>${combo.numbers.join(', ')}</strong> - $${combo.betValue.toLocaleString()} <button class="remove-combo" data-idx="${idx}">❌</button>`;
+    combosList.appendChild(div);
+  });
+  totalSpan.textContent = total.toLocaleString();
+  document.querySelectorAll('.remove-combo').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(btn.dataset.idx);
+      currentTicket.splice(idx, 1);
+      updateTicketUI();
+    });
+  });
+}
+
+function updatePrintedTicketsUI() {
+  currentTicketLinesDiv.innerHTML = '';
+  if (printedTickets.length === 0) {
+    currentTicketLinesDiv.innerHTML = '<em>No hay boletas impresas recientes.</em>';
+    return;
+  }
+  printedTickets.forEach((ticket, idx) => {
+    const lineDiv = document.createElement('div');
+    lineDiv.className = 'line-item';
+    lineDiv.innerHTML = `
+      <span><strong>${ticket.code}</strong> - ${ticket.combinations.map(c => `[${c.numbers.join(',')}]`).join(', ')} - $${ticket.total}</span>
+      <button class="cancel-line" data-idx="${idx}">✖ Cancelar</button>
+    `;
+    currentTicketLinesDiv.appendChild(lineDiv);
+  });
+  document.querySelectorAll('.cancel-line').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const idx = parseInt(btn.dataset.idx);
+      const ticket = printedTickets[idx];
+      if (!confirm(`¿Cancelar boleta ${ticket.code}? Se devolverá $${ticket.total} al presupuesto.`)) return;
+      const res = await fetch(`/api/ticket/${ticket.code}`, { method: 'DELETE' });
+      if (res.ok) {
+        printedTickets.splice(idx, 1);
+        updatePrintedTicketsUI();
+        await fetchBudgetAndProfit();
+        showToast(`Boleta ${ticket.code} cancelada totalmente.`);
+      } else {
+        const err = await res.json();
+        showToast(`Error: ${err.error}`);
+      }
+    });
+  });
+}
+
+function scheduleAutoMoveAfterBettingClosed() {
+  if (autoMoveTimer) clearTimeout(autoMoveTimer);
+  autoMoveTimer = setTimeout(() => {
+    if (printedTickets.length > 0) {
+      for (const ticket of printedTickets) {
+        canceledTickets.push({ ...ticket, cancelRound: currentRound });
+      }
+      printedTickets = [];
+      updatePrintedTicketsUI();
+      if (winningTicketsDropdown.classList.contains('show')) loadDropdownContent();
+      showToast(`${canceledTickets.length} boletas movidas al panel gestionable.`);
+    }
+    autoMoveTimer = null;
+  }, 30000);
+}
+
+function purgeOldCanceledTickets() {
+  const before = canceledTickets.length;
+  canceledTickets = canceledTickets.filter(t => (currentRound - t.cancelRound) < 5);
+  if (before !== canceledTickets.length) {
+    if (winningTicketsDropdown.classList.contains('show')) loadDropdownContent();
+    showToast(`Se eliminaron ${before - canceledTickets.length} boletas antiguas.`);
+  }
+}
+
+async function loadDropdownContent() {
+  const res = await fetch('/api/admin/pending-payments');
+  const winningTickets = await res.json();
+  let html = '';
+  if (winningTickets.length > 0) {
+    html += `<div class="section-title">🏆 Boletas ganadoras pendientes de pago</div>`;
+    for (const ticket of winningTickets) {
+      const fullRes = await fetch(`/api/ticket/full/${ticket.ticketCode}`);
+      const fullData = await fullRes.json();
+      const combinations = fullData.combinations || [];
+      html += `
+        <div class="recent-ticket-item">
+          <div><strong>Código:</strong> ${ticket.ticketCode} | <strong>Monto a pagar:</strong> $${ticket.toPay?.toLocaleString() || 0}</div>
+          <div class="combinations-list">${combinations.map(c => `<div>${c.numbers.join(', ')} - $${c.betValue}</div>`).join('')}</div>
+          <div style="margin-top:8px;">
+            <button class="btn pay-btn" data-code="${ticket.ticketCode}" data-amount="${ticket.toPay}" style="background:green;">💵 Pagar solo</button>
+            <button class="btn pay-and-repeat-btn" data-code="${ticket.ticketCode}" data-amount="${ticket.toPay}" style="background:#f0a500;">⚡ Pagar y repetir</button>
+            <button class="btn pay-and-print-btn" data-code="${ticket.ticketCode}" data-amount="${ticket.toPay}" style="background:#2c7da0;">🖨️ Pagar e imprimir</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+  if (canceledTickets.length > 0) {
+    html += `<div class="section-title">📋 Boletas disponibles (para reutilizar)</div>`;
+    for (let i = 0; i < canceledTickets.length; i++) {
+      const ticket = canceledTickets[i];
+      html += `
+        <div class="recent-ticket-item" data-cancel-idx="${i}">
+          <div><strong>Código:</strong> ${ticket.code} | <strong>Total:</strong> $${ticket.total} | <strong>Expira en ronda:</strong> ${ticket.cancelRound + 5}</div>
+          <div class="combinations-list">${ticket.combinations.map(c => `<div>${c.numbers.join(', ')} - $${c.betValue}</div>`).join('')}</div>
+          <div style="margin-top:8px;">
+            <button class="btn add-canceled-lines" data-idx="${i}">➕ Agregar líneas</button>
+            <button class="btn repeat-canceled" data-idx="${i}">🔁 Repetir boleta</button>
+            <button class="btn print-canceled" data-idx="${i}">🖨️ Imprimir</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+  if (!winningTickets.length && canceledTickets.length === 0) {
+    html = '<div style="text-align:center;padding:10px;">No hay boletas gestionables</div>';
+  }
+  winningTicketsDropdown.innerHTML = html;
+
+  // Botón Pagar solo
+  document.querySelectorAll('.pay-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const code = btn.getAttribute('data-code');
+      const amount = parseFloat(btn.getAttribute('data-amount'));
+      const res = await fetch('/api/ticket/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketCode: code, amount })
+      });
+      if (res.ok) {
+        showToast(`✅ Boleta ${code} pagada`);
+        loadDropdownContent();
+        await fetchBudgetAndProfit();
+      } else {
+        const err = await res.json();
+        showToast(`❌ Error: ${err.error}`);
+      }
+    });
+  });
+
+  // Botón Pagar y repetir
+  document.querySelectorAll('.pay-and-repeat-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const code = btn.getAttribute('data-code');
+      const amount = parseFloat(btn.getAttribute('data-amount'));
+      const payRes = await fetch('/api/ticket/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketCode: code, amount })
+      });
+      if (!payRes.ok) {
+        const err = await payRes.json();
+        showToast(`❌ Error al pagar: ${err.error}`);
+        return;
+      }
+      const fullRes = await fetch(`/api/ticket/full/${code}`);
+      const data = await fullRes.json();
+      if (data && data.combinations) {
+        for (const combo of data.combinations) {
+          currentTicket.push({ numbers: combo.numbers, betValue: combo.betValue });
+        }
+        updateTicketUI();
+        showToast(`✅ Boleta ${code} pagada y líneas agregadas a la boleta actual`);
+      }
+      loadDropdownContent();
+      await fetchBudgetAndProfit();
+    });
+  });
+
+  // Botón Pagar e imprimir
+  document.querySelectorAll('.pay-and-print-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const code = btn.getAttribute('data-code');
+      const amount = parseFloat(btn.getAttribute('data-amount'));
+      const payRes = await fetch('/api/ticket/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketCode: code, amount })
+      });
+      if (!payRes.ok) {
+        const err = await payRes.json();
+        showToast(`❌ Error al pagar: ${err.error}`);
+        return;
+      }
+      const fullRes = await fetch(`/api/ticket/full/${code}`);
+      const data = await fullRes.json();
+      if (data && data.combinations) {
+        const printContent = generateThermalReceipt(code, data.combinations, data.ticket.totalAmount, true);
+        printWithHiddenIframe(printContent);
+        showToast(`✅ Boleta ${code} pagada e impresa`);
+      }
+      loadDropdownContent();
+      await fetchBudgetAndProfit();
+    });
+  });
+
+  // Eventos para boletas canceladas
+  document.querySelectorAll('.add-canceled-lines').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(btn.getAttribute('data-idx'));
+      const ticket = canceledTickets[idx];
+      for (const combo of ticket.combinations) {
+        currentTicket.push({ numbers: combo.numbers, betValue: combo.betValue });
+      }
+      updateTicketUI();
+      showToast(`Líneas de ${ticket.code} agregadas a la boleta actual`);
+    });
+  });
+
+  document.querySelectorAll('.repeat-canceled').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const idx = parseInt(btn.getAttribute('data-idx'));
+      const ticket = canceledTickets[idx];
+      const combinations = ticket.combinations;
+      const response = await fetch('/api/bets/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ combinations })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        showToast(`✅ Boleta repetida. Nuevo código: ${data.ticketCode}`);
+        await fetchBudgetAndProfit();
+        const printContent = generateThermalReceipt(data.ticketCode, combinations, data.totalAmount, false);
+        printWithHiddenIframe(printContent);
+        printedTickets.push({
+          code: data.ticketCode,
+          combinations: combinations,
+          total: data.totalAmount
+        });
+        updatePrintedTicketsUI();
+        loadDropdownContent();
+      } else {
+        alert('Error: ' + (data.error || ''));
+      }
+    });
+  });
+
+  document.querySelectorAll('.print-canceled').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const idx = parseInt(btn.getAttribute('data-idx'));
+      const ticket = canceledTickets[idx];
+      const combinations = ticket.combinations;
+      const response = await fetch('/api/bets/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ combinations })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        await fetchBudgetAndProfit();
+        const printContent = generateThermalReceipt(data.ticketCode, combinations, data.totalAmount, false);
+        printWithHiddenIframe(printContent);
+        printedTickets.push({
+          code: data.ticketCode,
+          combinations: combinations,
+          total: data.totalAmount
+        });
+        updatePrintedTicketsUI();
+        showToast(`Boleta ${data.ticketCode} impresa`);
+        loadDropdownContent();
+      } else {
+        alert('Error: ' + (data.error || ''));
+      }
+    });
+  });
+}
+
+// ========== FUNCIONES DE IMPRESIÓN ==========
+function printWithHiddenIframe(htmlContent) {
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'absolute';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+  const iframeDoc = iframe.contentWindow.document;
+  iframeDoc.open();
+  iframeDoc.write(htmlContent);
+  iframeDoc.close();
+  iframe.contentWindow.focus();
+  iframe.contentWindow.print();
+  setTimeout(() => {
+    document.body.removeChild(iframe);
+  }, 1000);
+}
+
+function generateThermalReceipt(ticketCode, combinations, total, paid = false) {
+  const date = new Date().toLocaleString();
+  const lines = [];
+  lines.push('========================');
+  lines.push('🎫 LA BALOTERA GANADORA');
+  lines.push('========================');
+  lines.push(`Código: ${ticketCode}`);
+  lines.push(`Fecha: ${date}`);
+  lines.push('------------------------');
+  lines.push('COMBINACIONES:');
+  for (const combo of combinations) {
+    lines.push(`${combo.numbers.join(',')} - $${combo.betValue}`);
+  }
+  lines.push('------------------------');
+  lines.push(`TOTAL: $${total}`);
+  if (paid) {
+    lines.push('------------------------');
+    lines.push('✅ PAGADA');
+    lines.push(`Pago: ${new Date().toLocaleString()}`);
+  } else {
+    lines.push('------------------------');
+    lines.push('PRESENTE ESTA BOLETA');
+    lines.push('PARA COBRAR');
+  }
+  lines.push('========================');
+  lines.push('GRACIAS POR JUGAR');
+  lines.push('========================');
+  lines.push('');
+  lines.push('');
+  lines.push('');
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Boleta ${ticketCode}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { size: 58mm auto; margin: 0; }
+    @media print {
+      body { font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; width: 58mm; margin: 0; padding: 2mm; background: white; color: black; }
+      .receipt { width: 100%; text-align: center; }
+      .receipt div { white-space: pre-wrap; word-wrap: break-word; }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt">${lines.map(l => `<div>${l}</div>`).join('\n')}</div>
+</body>
+</html>`;
+}
+
+// ========== AGREGAR COMBINACIÓN Y MÁQUINA ==========
+document.getElementById('addComboBtn').addEventListener('click', () => {
+  if (!bettingEnabled) { warningDiv.textContent = 'No se pueden agregar combinaciones ahora.'; return; }
+  if (selectedNumbers.length === 0) { warningDiv.textContent = 'Selecciona al menos un número.'; return; }
+  let bet = currentBetValue;
+  if (!bet) {
+    bet = 1000;
+    const btn1000 = Array.from(document.querySelectorAll('.bet-value-btn')).find(b => b.textContent === '$1,000' || b.textContent === '$1.000');
+    if (btn1000) btn1000.classList.add('active');
+    currentBetValue = 1000;
+  }
+  currentTicket.push({ numbers: [...selectedNumbers], betValue: bet });
+  updateTicketUI();
+  selectedNumbers = [];
+  updateSelectionUI();
+  warningDiv.textContent = '';
+});
+
+function machinePick(count) {
+  if (!bettingEnabled) { warningDiv.textContent = 'Apuestas no permitidas ahora.'; return; }
+  let bet = currentBetValue;
+  if (!bet) {
+    bet = 1000;
+    const btn1000 = Array.from(document.querySelectorAll('.bet-value-btn')).find(b => b.textContent === '$1,000' || b.textContent === '$1.000');
+    if (btn1000) btn1000.classList.add('active');
+    currentBetValue = 1000;
+  }
+  const shuffled = Array.from({ length: 80 }, (_, i) => i + 1);
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const picks = shuffled.slice(0, count);
+  currentTicket.push({ numbers: picks, betValue: bet });
+  updateTicketUI();
+  currentBetValue = null;
+  document.querySelectorAll('#betValueButtons button').forEach(b => b.classList.remove('active'));
+}
+
+document.getElementById('machinePick2').addEventListener('click', () => machinePick(2));
+document.getElementById('machinePick3').addEventListener('click', () => machinePick(3));
+document.getElementById('machinePick4').addEventListener('click', () => machinePick(4));
+document.getElementById('machinePick5').addEventListener('click', () => machinePick(5));
+
+document.getElementById('printTicketBtn').addEventListener('click', async () => {
+  if (currentTicket.length === 0) { alert('No hay combinaciones para imprimir'); return; }
+  if (!bettingEnabled) { alert('Apuestas cerradas.'); return; }
+  const totalBet = currentTicket.reduce((s,c)=>s+c.betValue,0);
+  if (machineBudget < totalBet) { alert('Presupuesto insuficiente.'); return; }
+
+  const response = await fetch('/api/bets/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ combinations: currentTicket })
+  });
+  const data = await response.json();
+  if (response.ok) {
+    await fetchBudgetAndProfit();
+    const printContent = generateThermalReceipt(data.ticketCode, currentTicket, data.totalAmount, false);
+    printWithHiddenIframe(printContent);
+
+    printedTickets.push({
+      code: data.ticketCode,
+      combinations: [...currentTicket],
+      total: data.totalAmount
+    });
+    updatePrintedTicketsUI();
+    currentTicket = [];
+    updateTicketUI();
+    showToast(`Boleta ${data.ticketCode} impresa. Puedes cancelarla si no se paga.`);
+  } else {
+    alert('Error: ' + (data.error || ''));
+  }
+});
+
+async function fetchBudgetAndProfit() {
+  try {
+    const res = await fetch('/api/admin/config');
+    const cfg = await res.json();
+    machineBudget = parseInt(cfg.machineBudget) || 5000000;
+    machineBudgetSpan.textContent = machineBudget.toLocaleString();
+    updateUIEnabled();
+    const profitRes = await fetch('/api/stats/daily-profit');
+    const profitData = await profitRes.json();
+    dailyProfit = profitData.profit;
+    dailyProfitSpan.textContent = dailyProfit.toLocaleString();
+  } catch(e) { console.error(e); }
+}
+
+dropdownBtn.addEventListener('click', () => {
+  winningTicketsDropdown.classList.toggle('show');
+  if (winningTicketsDropdown.classList.contains('show')) {
+    loadDropdownContent();
+  }
+});
+
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.className = 'toast-message';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ========== MODO TRAMPA (BOTÓN Y SOCKET) ==========
+if (trapToggleBtn) {
+  trapToggleBtn.addEventListener('click', async () => {
+    const res = await fetch('/api/toggle-trap-mode', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      trapToggleBtn.style.backgroundColor = data.enabled ? 'green' : 'red';
+      trapToggleBtn.title = data.enabled ? 'Modo trampa ACTIVADO (evita números apostados)' : 'Modo normal (sorteo aleatorio)';
+      showToast(data.enabled ? 'Modo trampa ACTIVADO' : 'Modo normal RESTAURADO');
+    } else {
+      showToast('Error al cambiar modo');
+    }
+  });
+}
+
+socket.on('trapModeChanged', ({ enabled }) => {
+  if (trapToggleBtn) {
+    trapToggleBtn.style.backgroundColor = enabled ? 'green' : 'red';
+    trapToggleBtn.title = enabled ? 'Modo trampa ACTIVADO' : 'Modo normal';
+  }
+});
+
+// ========== OTROS EVENTOS SOCKET ==========
+socket.on('ticketPaid', ({ ticketCode, amount }) => {
+  showToast(`Boleta ${ticketCode} pagada`);
+  if (winningTicketsDropdown.classList.contains('show')) loadDropdownContent();
+  printedTickets = printedTickets.filter(t => t.code !== ticketCode);
+  updatePrintedTicketsUI();
+  canceledTickets = canceledTickets.filter(t => t.code !== ticketCode);
+  fetchBudgetAndProfit();
+});
+
+socket.on('ticketRepeated', ({ originalCode, newCode, combinations, total }) => {
+  showToast(`Boleta repetida: ${newCode} (desde ${originalCode})`);
+  printedTickets.push({ code: newCode, combinations, total });
+  updatePrintedTicketsUI();
+  if (winningTicketsDropdown.classList.contains('show')) loadDropdownContent();
+  fetchBudgetAndProfit();
+});
+
+socket.on('roundUpdate', ({ round }) => {
+  currentRound = round;
+  purgeOldCanceledTickets();
+});
+
+socket.on('bettingClosed', () => {
+  isBettingPhaseGlobal = false;
+  updateUIEnabled();
+  warningDiv.textContent = '⛔ ¡No más apuestas! ⛔';
+  if (currentTicket.length > 0 && confirm('¿Imprimir la boleta actual?'))
+    document.getElementById('printTicketBtn').click();
+  scheduleAutoMoveAfterBettingClosed();
+});
+
+socket.on('resetGame', () => {
+  if (autoMoveTimer) clearTimeout(autoMoveTimer);
+  autoMoveTimer = null;
+});
+
+socket.on('phaseChange', ({ isBettingPhase }) => {
+  isBettingPhaseGlobal = isBettingPhase;
+  updateUIEnabled();
+});
+
+socket.on('budgetUpdated', ({ budget }) => {
+  machineBudget = budget;
+  machineBudgetSpan.textContent = budget.toLocaleString();
+  updateUIEnabled();
+});
+
+socket.on('dailyProfitUpdated', ({ dailyProfit }) => {
+  dailyProfitSpan.textContent = dailyProfit.toLocaleString();
+});
+
+// Tecla Enter para agregar o imprimir
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const activeElement = document.activeElement;
+    if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'BUTTON')) {
+      return;
+    }
+    if (selectedNumbers.length > 0) {
+      const addBtn = document.getElementById('addComboBtn');
+      if (addBtn && !addBtn.disabled) {
+        addBtn.click();
+        showToast('📌 Combinación agregada (Enter)');
+      }
+    } else if (currentTicket.length > 0) {
+      const printBtn = document.getElementById('printTicketBtn');
+      if (printBtn && !printBtn.disabled) {
+        printBtn.click();
+        showToast('🖨️ Imprimiendo boleta (Enter)');
+      }
+    }
+  }
+});
+
+fetchBudgetAndProfit();
+setInterval(fetchBudgetAndProfit, 10000);
+updatePrintedTicketsUI();

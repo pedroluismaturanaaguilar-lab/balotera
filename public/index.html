@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>La Balotera Ganadora | Pantalla Principal</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="main-screen">
+  <div class="left-panel">
+    <div class="top-bar">
+      <div class="round-info">
+        <span class="round-label">NUM. RONDA</span>
+        <span id="roundNumber" class="round-value">1</span>
+      </div>
+      <div id="timerDisplay" class="timer">Tiempo para apostar: 4:00</div>
+    </div>
+
+    <div class="numbers-drawn-bar" id="numbersDrawnBar"></div>
+    <!-- Nuevo contenedor para la cuenta regresiva visual -->
+    <div id="visualCountdown" class="visual-countdown" style="display: none;">
+      <span class="countdown-number">8</span>
+    </div>
+    <div class="balls-grid" id="ballsGrid"></div>
+    <div class="mini-accumulated-bar">
+      <div id="miniFill" class="fill cafe"></div>
+    </div>
+    <div id="winnerMessage" class="winner-message"></div>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>
