@@ -18,7 +18,7 @@ ballsGrid.innerHTML = '';
 for (let i = 1; i <= 80; i++) {
   const ball = document.createElement('div');
   ball.className = 'ball';
-  ball.textContent = i;
+  ball.innerHTML = `<span class="ball-number">${i}</span>`;
   ball.id = `ball_${i}`;
   ballsGrid.appendChild(ball);
 }
