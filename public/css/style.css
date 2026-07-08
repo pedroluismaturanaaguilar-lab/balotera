@@ -576,7 +576,7 @@ body.admin-page {
     text-shadow:
         0 0 5px #00FF00,
         0 0 10px orange,
-        0 0 15px red;
+        0 0 15px white;
     animation:bannerMove 40s linear infinite;
 }
 
