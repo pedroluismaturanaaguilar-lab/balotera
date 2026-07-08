@@ -577,7 +577,7 @@ body.admin-page {
         0 0 5px #FFD700,
         0 0 10px orange,
         0 0 15px red;
-    animation:bannerMove 15s linear infinite;
+    animation:bannerMove 2s linear infinite;
 }
 
 @keyframes bannerMove{
@@ -587,7 +587,7 @@ body.admin-page {
     }
 
     100%{
-        transform:translateX(-80%);
+        transform:translateX(-100%);
     }
 
 }
