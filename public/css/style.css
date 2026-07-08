@@ -554,3 +554,40 @@ body.admin-page {
     color: white;
     font-weight: bold;
 }
+
+/*==========================
+   Banner Publicitario
+===========================*/
+
+.banner-publicidad{
+    flex:1;
+    overflow:hidden;
+    margin:0 15px;
+    height:34px;
+    display:flex;
+    align-items:center;
+}
+
+.banner-texto{
+    white-space:nowrap;
+    font-size:1.05rem;
+    font-weight:bold;
+    color:#FFD700;
+    text-shadow:
+        0 0 5px #FFD700,
+        0 0 10px orange,
+        0 0 15px red;
+    animation:bannerMove 28s linear infinite;
+}
+
+@keyframes bannerMove{
+
+    0%{
+        transform:translateX(100%);
+    }
+
+    100%{
+        transform:translateX(-100%);
+    }
+
+}
