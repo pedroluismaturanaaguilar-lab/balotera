@@ -159,7 +159,7 @@ body {
   position: absolute;
   top: -4px;
   left: -3px;
-  font-size: 0.7rem;
+  font-size: 1.5rem;
   background: none;
   text-shadow: 0 0 1px black;
   z-index: 10;
@@ -170,7 +170,7 @@ body {
   position: absolute;
   top: -4px;
   left: -3px;
-  font-size: 0.7rem;
+  font-size: 1.5rem;
   background: none;
   text-shadow: 0 0 1px black;
   z-index: 10;
