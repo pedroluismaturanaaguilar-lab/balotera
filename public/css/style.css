@@ -123,9 +123,9 @@ body {
 .ball {
   position: relative;
   background: radial-gradient(circle at 30% 30%, #1E5631, #0A2F1A);
-  color: red;
+  color: white;
   font-weight: bold;
-  font-size: .48rem;
+  font-size: 2rem;
   display: flex;
   align-items: center;
   justify-content: center;
