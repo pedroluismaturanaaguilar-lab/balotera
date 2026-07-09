@@ -577,7 +577,7 @@ body.admin-page {
         0 0 5px #00FF00,
         0 0 10px orange,
         0 0 15px white;
-    animation:bannerMove 40s linear infinite;
+    animation:bannerMove 80s linear infinite;
 }
 
 @keyframes bannerMove{
