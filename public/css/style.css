@@ -566,6 +566,12 @@ body.admin-page {
     height:34px;
     display:flex;
     align-items:center;
+     white-space:nowrap;
+}
+.banner-track{
+    display:flex;
+    width:max-content;
+    animation:bannerMove 20s linear infinite;
 }
 
 .banner-texto{
@@ -577,7 +583,7 @@ body.admin-page {
         0 0 5px #00FF00,
         0 0 10px orange,
         0 0 15px white;
-    animation:bannerMove 80s linear infinite;
+  padding-right:80px;
 }
 
 @keyframes bannerMove{
