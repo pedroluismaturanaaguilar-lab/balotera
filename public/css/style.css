@@ -571,7 +571,7 @@ body.admin-page {
 .banner-track{
     display:flex;
     width:max-content;
-    animation:bannerMove 20s linear infinite;
+    animation:bannerMove 85s linear infinite;
 }
 
 .banner-texto{
