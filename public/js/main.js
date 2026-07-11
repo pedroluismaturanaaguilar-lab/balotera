@@ -24,6 +24,11 @@ for (let i = 1; i <= 80; i++) {
 }
 
 function updateMiniAccumulatedBar(current, target) {
+
+  console.log("Acumulado:", current);
+  console.log("Meta:", target);
+
+  
   const realPercent = (current / target) * 100;
   let visualPercent = 25 + (realPercent * 0.75);
   visualPercent = Math.min(visualPercent, 100);
