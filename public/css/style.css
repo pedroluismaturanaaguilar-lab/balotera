@@ -191,52 +191,23 @@ body {
 
 
 
-
+width: 100%;
+  height: 10px;
+  background: #555;
+  border-radius: 5px;
+  margin: 4px 0;
+  overflow: hidden;
+  flex-shrink: 0;
 .mini-accumulated-bar {
- position:relative;
-    width:100%;
-    height:22px;
-    background:#444;
-    border-radius:12px;
-    margin:6px 0;
-    overflow:hidden;
+
 }
   
 
-.bar-scale{
-    position:absolute;
-    inset:0;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:0 4px;
-    z-index:2;
-    pointer-events:none;
-}
-
-.bar-scale span{
-    font-size:8px;
-    color:white;
-    font-weight:bold;
-    text-shadow:0 0 2px black;
-}
 
 .fill{
-    position:absolute;
-    left:0;
-    top:0;
-    height:100%;
-    width:0%;
-    transition:width .5s, background-color .3s;
-    
-}
-
-
-
-
-
-
-
+  height: 100%;
+  width: 0%;
+  transition: width 0.5s, background-color 0.3s;
 }
 .fill.cafe { background: #8B4513; }
 .fill.rojo { background: #B22222; }
